@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vctrl/terpila-bot/db"
 	"github.com/vctrl/terpila-bot/db/memory"
-	"github.com/vctrl/terpila-bot/db/mongo"
 	"go.uber.org/zap"
 	"log"
 	"net/http"
@@ -59,7 +58,7 @@ func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (map[int64]string, error)
 
 func (tb *TerpilaBot) Tolerate(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64]string, error) {
 	// todo create new user if not exist
-	err := tb.Tolerances.Add(ctx, mongo.NewTolerance(uuid.New(), upd.Message.From.ID))
+	err := tb.Tolerances.Add(ctx, db.NewTolerance(uuid.New(), upd.Message.From.ID))
 	if err != nil {
 		return nil, errors.WithMessage(err, "add tolerance")
 	}

@@ -31,3 +31,11 @@ type Tolerances interface {
 	Add(ctx context.Context, tol *Tolerance) error
 	GetCountByUser(ctx context.Context, userID int64) (int64, error)
 }
+
+func NewTolerance(id uuid.UUID, userID int64) *Tolerance {
+	return &Tolerance{
+		ID:        id,
+		UserID:    userID,
+		CreatedAt: time.Now(),
+	}
+}
