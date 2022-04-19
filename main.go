@@ -21,7 +21,7 @@ var WebhookURL = "https://terpila-bot.herokuapp.com/"
 var BotToken = os.Getenv("BOT_TOKEN")
 var Port = ":" + os.Getenv("PORT")
 
-type cmdHandler func(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64]string, error)
+type cmdHandler func(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64][]string, error)
 
 type TerpilaBot struct {
 	Cmds map[string]cmdHandler
@@ -46,7 +46,7 @@ func NewTerpilaBot(ter db.Terpiloids, tol db.Tolerances) *TerpilaBot {
 	return tb
 }
 
-func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (map[int64]string, error) {
+func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (map[int64][]string, error) {
 	cmdHandler, ok := tb.Cmds[upd.Message.Text]
 	if !ok {
 		return nil, fmt.Errorf("command is not supported")
@@ -58,7 +58,7 @@ func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (map[int64]string, error)
 	return cmdHandler(ctx, upd)
 }
 
-func (tb *TerpilaBot) Tolerate(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64]string, error) {
+func (tb *TerpilaBot) Tolerate(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64][]string, error) {
 	// todo create new user if not exist
 	err := tb.Tolerances.Add(ctx, db.NewTolerance(uuid.New(), upd.Message.From.ID))
 	if err != nil {
@@ -70,22 +70,24 @@ func (tb *TerpilaBot) Tolerate(ctx context.Context, upd *tgbotapi.Update, params
 		return nil, errors.WithMessage(err, "get count by user")
 	}
 
-	res := make(map[int64]string)
+	msgs := make([]string, 0, 1)
 	if cnt == 1 {
-		res[upd.Message.From.ID] = "В первый раз может быть непривычно, но всё приходит с опытом!"
+		msgs = append(msgs,"В первый раз может быть непривычно, но всё приходит с опытом!")
 	}
 
-	res[upd.Message.From.ID] = fmt.Sprintf("Затерпел")
-	return res, nil
+	msgs = append(msgs, "Затерпел")
+	return map[int64][]string {
+		upd.Message.From.ID: msgs,
+	}, nil
 }
 
-func (tb *TerpilaBot) GetStats(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64]string, error) {
+func (tb *TerpilaBot) GetStats(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64][]string, error) {
 	cnt, err := tb.Tolerances.GetCountByUser(ctx, upd.Message.From.ID)
 	if err != nil {
 		return nil, errors.WithMessage(err, "get count by user id")
 	}
 
-	result := map[int64]string{upd.Message.From.ID: fmt.Sprintf("Ты затерпел %d раз", cnt)}
+	result := map[int64][]string{upd.Message.From.ID: {fmt.Sprintf("Ты затерпел %d раз", cnt)}}
 
 	return result, nil
 }
@@ -142,8 +144,10 @@ func main() {
 			bot.Send(tgbotapi.NewMessage(chatID, "error happened"))
 		}
 
-		for id, text := range result {
-			bot.Send(tgbotapi.NewMessage(id, text))
+		for id, msgs := range result {
+			for _, m := range msgs {
+				bot.Send(tgbotapi.NewMessage(id, m))
+			}
 		}
 	}
 
