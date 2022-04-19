@@ -38,12 +38,12 @@ func NewTerpilaBot(ter db.Terpiloids, tol db.Tolerances) *TerpilaBot {
 		Tolerances: tol,
 	}
 
-	return &TerpilaBot{
-		Cmds: map[string]cmdHandler {
-			"/tolerate": tb.Tolerate,
-			"/stats": tb.GetStats,
-		},
+	tb.Cmds = map[string]cmdHandler {
+		"/tolerate": tb.Tolerate,
+		"/stats": tb.GetStats,
 	}
+
+	return tb
 }
 
 func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (map[int64]string, error) {
