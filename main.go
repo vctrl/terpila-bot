@@ -159,6 +159,7 @@ func main() {
 	tb := NewTerpilaBot(nil, tol)
 
 	for update := range updates {
+		sugar.Debug(update)
 		result, err := tb.ExecuteCmd(&update)
 		chatID := update.Message.Chat.ID
 		switch err1 := errors.Cause(err).(type) {
