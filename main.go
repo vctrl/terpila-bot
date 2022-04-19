@@ -168,6 +168,7 @@ func main() {
 				sugar.Errorf("error executing command: %v", err)
 			}
 			bot.Send(tgbotapi.NewMessage(chatID, err1.Error()))
+			continue
 		default:
 			sugar.Errorf("error executing command: %v", err)
 		}
