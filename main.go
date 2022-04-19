@@ -161,9 +161,15 @@ func main() {
 	for update := range updates {
 		result, err := tb.ExecuteCmd(&update)
 		chatID := update.Message.Chat.ID
-		if errors.Is(err, &CmdNotSupportedErr{}) {
+		switch err1 := errors.Cause(err).(type) {
+		case *CmdNotSupportedErr:
+			_, err = bot.Send(tgbotapi.NewMessage(chatID, err.Error()))
+			if err != nil {
+				sugar.Errorf("error executing command: %v", err)
+			}
+			bot.Send(tgbotapi.NewMessage(chatID, err1.Error()))
+		default:
 			sugar.Errorf("error executing command: %v", err)
-			bot.Send(tgbotapi.NewMessage(chatID, err.Error()))
 		}
 		if err != nil {
 			sugar.Errorf("error executing command: %v", err)
@@ -171,7 +177,10 @@ func main() {
 
 		for id, msgs := range result {
 			for _, m := range msgs {
-				bot.Send(tgbotapi.NewMessage(id, m))
+				_, err = bot.Send(tgbotapi.NewMessage(id, m))
+				if err != nil {
+					sugar.Errorf("error executing command: %v", err)
+				}
 			}
 		}
 	}
