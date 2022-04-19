@@ -23,13 +23,18 @@ var Port = ":" + os.Getenv("PORT")
 
 type cmdHandler func(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64][]string, error)
 
+type CmdNotSupportedErr struct {
+	msg string
+}
+
+func (e *CmdNotSupportedErr) Error() string {
+	return e.msg
+}
+
 type TerpilaBot struct {
 	Cmds map[string]cmdHandler
-
 	Terpiloids db.Terpiloids
-
 	Tolerances db.Tolerances
-
 }
 
 func NewTerpilaBot(ter db.Terpiloids, tol db.Tolerances) *TerpilaBot {
@@ -49,7 +54,9 @@ func NewTerpilaBot(ter db.Terpiloids, tol db.Tolerances) *TerpilaBot {
 func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (map[int64][]string, error) {
 	cmdHandler, ok := tb.Cmds[upd.Message.Text]
 	if !ok {
-		return nil, errors.New("command not supported")
+		return nil, &CmdNotSupportedErr{
+			"Я пока ещё совсем молод и знаю не очень много команд. Придётся немного потерпеть, пока появятся новые",
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -154,9 +161,12 @@ func main() {
 	for update := range updates {
 		result, err := tb.ExecuteCmd(&update)
 		chatID := update.Message.Chat.ID
+		if errors.Is(err, &CmdNotSupportedErr{}) {
+			sugar.Errorf("error executing command: %v", err)
+			bot.Send(tgbotapi.NewMessage(chatID, err.Error()))
+		}
 		if err != nil {
 			sugar.Errorf("error executing command: %v", err)
-			bot.Send(tgbotapi.NewMessage(chatID, "error happened"))
 		}
 
 		for id, msgs := range result {
