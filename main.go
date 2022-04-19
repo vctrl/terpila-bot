@@ -47,9 +47,7 @@ func NewTerpilaBot(ter db.Terpiloids, tol db.Tolerances) *TerpilaBot {
 }
 
 func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (map[int64]string, error) {
-	var cmd, arg string
-
-	cmdHandler, ok := tb.Cmds[cmd]
+	cmdHandler, ok := tb.Cmds[upd.Message.Text]
 	if !ok {
 		return nil, fmt.Errorf("command is not supported")
 	}
@@ -57,7 +55,7 @@ func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (map[int64]string, error)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	return cmdHandler(ctx, upd, arg)
+	return cmdHandler(ctx, upd)
 }
 
 func (tb *TerpilaBot) Tolerate(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64]string, error) {
