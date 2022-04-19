@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/vctrl/terpila-bot/db"
+	"github.com/vctrl/terpila-bot/db/memory"
 	"github.com/vctrl/terpila-bot/db/mongo"
 	"go.uber.org/zap"
 	"log"
@@ -17,7 +18,7 @@ import (
 	"time"
 )
 
-var WebhookURL = "https://vctrl-terpilabot.herokuapp.com/"
+var WebhookURL = "https://terpilabot.herokuapp.com/"
 var BotToken = os.Getenv("BOT_TOKEN")
 var Port = ":" + os.Getenv("PORT")
 
@@ -32,7 +33,7 @@ type TerpilaBot struct {
 
 }
 
-func NewTerpilaBot() *TerpilaBot {
+func NewTerpilaBot(ter db.Terpiloids, tol db.Tolerances) *TerpilaBot {
 	tb := &TerpilaBot{}
 	return &TerpilaBot{
 		Cmds: map[string]cmdHandler {
@@ -129,7 +130,9 @@ func main() {
 
 	fmt.Printf("server started at %s\n", Port)
 
-	tb := NewTerpilaBot()
+	tol := memory.NewTolerancesMemory()
+	tb := NewTerpilaBot(nil, tol)
+
 	for update := range updates {
 		result, err := tb.ExecuteCmd(&update)
 		chatID := update.Message.Chat.ID
