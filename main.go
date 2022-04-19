@@ -33,7 +33,11 @@ type TerpilaBot struct {
 }
 
 func NewTerpilaBot(ter db.Terpiloids, tol db.Tolerances) *TerpilaBot {
-	tb := &TerpilaBot{}
+	tb := &TerpilaBot{
+		Terpiloids: ter,
+		Tolerances: tol,
+	}
+
 	return &TerpilaBot{
 		Cmds: map[string]cmdHandler {
 			"/tolerate": tb.Tolerate,
