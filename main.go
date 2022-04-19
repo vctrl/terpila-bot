@@ -49,7 +49,7 @@ func NewTerpilaBot(ter db.Terpiloids, tol db.Tolerances) *TerpilaBot {
 func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (map[int64][]string, error) {
 	cmdHandler, ok := tb.Cmds[upd.Message.Text]
 	if !ok {
-		return nil, fmt.Errorf("command is not supported")
+		return nil, errors.New("command not supported")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -87,9 +87,24 @@ func (tb *TerpilaBot) GetStats(ctx context.Context, upd *tgbotapi.Update, params
 		return nil, errors.WithMessage(err, "get count by user id")
 	}
 
-	result := map[int64][]string{upd.Message.From.ID: {fmt.Sprintf("Ты затерпел %d раз", cnt)}}
+	postfix := raz(cnt)
+	result := map[int64][]string{upd.Message.From.ID: {fmt.Sprintf("Ты затерпел %d %s", cnt, postfix)}}
 
 	return result, nil
+}
+
+func raz(n int64) string {
+	if n >= 10 && n <= 20 {
+		return "раз"
+	}
+
+	d := n % 10
+
+	if d == 2 || d == 3 || d == 4 {
+		return "раза"
+	}
+
+	return "раз"
 }
 
 func main() {
