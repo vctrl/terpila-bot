@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-var WebhookURL = "https://terpilabot.herokuapp.com/"
+var WebhookURL = "https://terpila-bot.herokuapp.com/"
 var BotToken = os.Getenv("BOT_TOKEN")
 var Port = ":" + os.Getenv("PORT")
 
