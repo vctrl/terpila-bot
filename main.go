@@ -10,9 +10,11 @@ import (
 	"github.com/vctrl/terpila-bot/db/memory"
 	"go.uber.org/zap"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -20,8 +22,26 @@ import (
 var WebhookURL = "https://terpila-bot.herokuapp.com/"
 var BotToken = os.Getenv("BOT_TOKEN")
 var Port = ":" + os.Getenv("PORT")
+var quotes = []string {
+	"Основа всякой мудрости есть терпение. Платон\n",
+	"Сила заключает в себе также терпение. В нетерпении проявляется слабость. Г. Гауптман\n",
+	"Терпение — добродетель бессильного и украшение сильного. Древнеиндийский афоризм\n",
+	"Терпение — добродетель нищих. Ф. Массинджер\n",
+	"Терпение — единственное настоящее испытание цивилизации. А. Хелпс\n",
+	"Терпение — лучшая религия. В. Гюго\n",
+	"Терпение — опора слабости; нетерпение — гибель силы. Ч. Колтон\n",
+	"Терпение — это дитя силы, упрямство — плод слабости, а именно слабости ума. М. Эбнер-Эшенбах\n",
+	"Терпение — это то, без чего Вера, Надежда, Любовь ничто. Р. Зубкова\n",
+	"Терпение и время дают больше, чем сила или страсть. Ж. Лафонтен\n",
+}
 
-type cmdHandler func(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64][]string, error)
+type resp map[int64][]string
+
+func r(receiverID int64, msg string) resp {
+	return map[int64][]string {receiverID: {msg}}
+}
+
+type cmdHandler func(ctx context.Context, upd *tgbotapi.Update, params ...string) (resp, error)
 
 type CmdNotSupportedErr struct {
 	msg string
@@ -51,21 +71,37 @@ func NewTerpilaBot(ter db.Terpiloids, tol db.Tolerances) *TerpilaBot {
 	return tb
 }
 
-func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (map[int64][]string, error) {
-	cmdHandler, ok := tb.Cmds[upd.Message.Text]
-	if !ok {
-		return nil, &CmdNotSupportedErr{
-			"Я пока ещё совсем молод и знаю не очень много команд. Придётся немного потерпеть, пока появятся новые",
-		}
-	}
-
+func (tb *TerpilaBot) ExecuteCmd(upd *tgbotapi.Update) (resp, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
+	if upd.MyChatMember != nil {
+		return tb.AddToChat(ctx, upd)
+	}
+	if upd.Message != nil && upd.Message.NewChatMembers != nil && len(upd.Message.NewChatMembers) > 0 {
+		return tb.InviteMember(ctx, upd)
+	}
+
+	cmdHandler, ok := tb.Cmds[upd.Message.Text]
+	if !ok {
+		return tb.Parse(ctx, upd)
+	}
 
 	return cmdHandler(ctx, upd)
 }
 
-func (tb *TerpilaBot) Tolerate(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64][]string, error) {
+func (tb *TerpilaBot) AddToChat(ctx context.Context, upd *tgbotapi.Update, params ...string) (resp, error) {
+	return r(upd.MyChatMember.Chat.ID, "Всем чмоки в этом чате! Изберём же путь смирения, чтобы обрести вечную жизнь!"), nil
+}
+
+func (tb *TerpilaBot) InviteMember(ctx context.Context, upd *tgbotapi.Update, params ...string) (resp, error) {
+	invited := upd.Message.NewChatMembers[0].UserName
+	creator := upd.Message.From.UserName
+	return r(upd.Message.Chat.ID,
+			fmt.Sprintf("поздравляем %s с вступлением в ряд терпил! %s с нами уже давно, у него есть чему поучиться!",
+				invited, creator)), nil
+}
+
+func (tb *TerpilaBot) Tolerate(ctx context.Context, upd *tgbotapi.Update, params ...string) (resp, error) {
 	// todo create new user if not exist
 	err := tb.Tolerances.Add(ctx, db.NewTolerance(uuid.New(), upd.Message.From.ID))
 	if err != nil {
@@ -84,20 +120,37 @@ func (tb *TerpilaBot) Tolerate(ctx context.Context, upd *tgbotapi.Update, params
 
 	msgs = append(msgs, "Затерпел")
 	return map[int64][]string {
-		upd.Message.From.ID: msgs,
+		upd.Message.Chat.ID: msgs,
 	}, nil
 }
 
-func (tb *TerpilaBot) GetStats(ctx context.Context, upd *tgbotapi.Update, params ...string) (map[int64][]string, error) {
+func (tb *TerpilaBot) GetStats(ctx context.Context, upd *tgbotapi.Update, params ...string) (resp, error) {
 	cnt, err := tb.Tolerances.GetCountByUser(ctx, upd.Message.From.ID)
 	if err != nil {
 		return nil, errors.WithMessage(err, "get count by user id")
 	}
 
 	postfix := raz(cnt)
-	result := map[int64][]string{upd.Message.From.ID: {fmt.Sprintf("Ты затерпел %d %s", cnt, postfix)}}
+	result := r(upd.Message.Chat.ID, fmt.Sprintf("Ты затерпел %d %s", cnt, postfix))
 
 	return result, nil
+}
+
+func (tb *TerpilaBot) Parse(ctx context.Context, upd *tgbotapi.Update, params ...string) (resp, error) {
+	s := strings.ToLower(upd.Message.Text)
+	if strings.Contains(s, "терпил") ||
+		strings.Contains(s, "терпеть") ||
+		strings.Contains(s, "терпение") ||
+		strings.Contains(s, "терпения") ||
+		strings.Contains(s, "терпел") {
+		return r(upd.Message.Chat.ID, quotes[rand.Intn(len(quotes))]), nil
+	}
+
+	if strings.Contains(s, "вова спаси") {
+		return r(upd.Message.Chat.ID, "https://www.youtube.com/watch?v=YdXhQXMvYuM"), nil
+	}
+
+	return map[int64][]string{}, nil
 }
 
 func raz(n int64) string {
@@ -123,30 +176,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create new bot api: %v", err)
 	}
+	bot.Debug = true
+	log.Printf("Authorized on account %s", bot.Self.UserName)
 
-	wh, err := tgbotapi.NewWebhook(WebhookURL)
-	if err != nil {
-		log.Fatalf("failed to create webhook: %v", err)
-	}
-
-	_, err = bot.Request(wh)
-	if err != nil {
-		log.Fatalf("error setting webhook: %v", err)
-	}
-
-	info, err := bot.GetWebhookInfo()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if info.LastErrorDate != 0 {
-		log.Printf("Telegram callback failed: %s", info.LastErrorMessage)
-	}
-
-	updates := bot.ListenForWebhook("/")
 	server := &http.Server{
 		Addr: Port,
 	}
+
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			log.Fatalf("Failed to listen and serve: %+v", err)
@@ -158,12 +194,35 @@ func main() {
 	tol := memory.NewTolerancesMemory()
 	tb := NewTerpilaBot(nil, tol)
 
+	//u := tgbotapi.NewUpdate(0)
+	// u.Timeout = 60
+	//updates := bot.GetUpdatesChan(u)
+
+	updates := useWh(bot, WebhookURL)
+
 	for update := range updates {
 		result, err := tb.ExecuteCmd(&update)
-		chatID := update.Message.Chat.ID
+
+		var chatID int64
+		// new member status in group - not a message
+		if update.MyChatMember == nil && update.Message == nil {
+			sugar.Errorf("unknown message: %v", update)
+			continue
+		}
+
+		if update.MyChatMember != nil {
+			chatID = update.MyChatMember.Chat.ID
+		} else {
+			chatID = update.Message.Chat.ID
+		}
+
 		switch err1 := errors.Cause(err).(type) {
 		case *CmdNotSupportedErr:
 			bot.Send(tgbotapi.NewMessage(chatID, err1.Error()))
+			if err != nil {
+				sugar.Errorf("error executing command: %v", err)
+			}
+
 			if err != nil {
 				sugar.Errorf("error executing command: %v", err)
 			}
@@ -199,4 +258,27 @@ func main() {
 		server.Close()
 		log.Fatal("error shutdown server")
 	}
+}
+
+func useWh(bot *tgbotapi.BotAPI, url string) tgbotapi.UpdatesChannel {
+	wh, err := tgbotapi.NewWebhook(url)
+	if err != nil {
+		log.Fatalf("failed to create webhook: %v", err)
+	}
+
+	_, err = bot.Request(wh)
+	if err != nil {
+		log.Fatalf("error setting webhook: %v", err)
+	}
+
+	info, err := bot.GetWebhookInfo()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if info.LastErrorDate != 0 {
+		log.Printf("Telegram callback failed: %s", info.LastErrorMessage)
+	}
+
+	return bot.ListenForWebhook("/")
 }
